@@ -39,32 +39,16 @@ function xorCifrar(text, key) {
   ).toString("base64");
 }
 
-function xorDescifrar(encoded, key) {
-  const bytes = Buffer.from(encoded, "base64");
-  return Array.from(bytes).map((b, i) =>
-    String.fromCharCode(b ^ key.charCodeAt(i % key.length))
-  ).join("");
-}
-
 function obfuscarLua(codigo) {
   const clave = generarClave();
 
-  // Capa 1: XOR + Base64
   let cifrado = xorCifrar(codigo, clave);
-
-  // Capa 2: Invertir
   cifrado = cifrado.split("").reverse().join("");
-
-  // Capa 3: Otro Base64
   cifrado = Buffer.from(cifrado).toString("base64");
 
-  // Convertir clave a bytes Lua
   const claveBytes = clave.split("").map(c => c.charCodeAt(0)).join(",");
-
-  // Convertir cifrado a bytes Lua
   const dataBytes = cifrado.split("").map(c => c.charCodeAt(0)).join(",");
 
-  // Generar nombres falsos
   const nData = nombreFalso();
   const nClave = nombreFalso();
   const nResult = nombreFalso();
@@ -73,12 +57,10 @@ function obfuscarLua(codigo) {
   const nDec = nombreFalso();
   const nLoad = nombreFalso();
 
-  // Código basura
   const basura1 = codigoBasura();
   const basura2 = codigoBasura();
   const basura3 = codigoBasura();
 
-  // Generar Lua obfuscado válido
   const luaObfuscado = `-- Protected by CrypexBot
 ${basura1}
 local ${nData}={${dataBytes}}
@@ -100,7 +82,6 @@ local sb={}
 for i=1,#s do sb[i]=string.byte(s,i) end
 local kb={}
 for i=1,#k do kb[i]=string.byte(k,i) end
--- decode base64
 local b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local t,p,n={},0,0
 for i=1,#s do
@@ -110,9 +91,7 @@ if n>=8 then n=n-8 t[#t+1]=string.char(math.floor(p/2^n)%256) end
 end
 end
 local d=table.concat(t)
--- reverse
 d=d:reverse()
--- xor
 local res=""
 local kl=#k
 for i=1,#d do
@@ -124,6 +103,25 @@ local ${nResult}=${nLoad}(${nDec},${nB})
 load(${nResult})()`;
 
   return luaObfuscado;
+}
+
+function deobfuscarLua(texto) {
+  const dataMatch = texto.match(/local \w+={([\d,]+)}/);
+  const claveMatch = texto.match(/local \w+={([\d,]+)}/g);
+  if (!dataMatch || !claveMatch || claveMatch.length < 2) return null;
+
+  const dataBytes = dataMatch[1].split(",").map(Number);
+  const claveBytes = claveMatch[1].match(/{([\d,]+)}/)[1].split(",").map(Number);
+
+  const datos = dataBytes.map(b => String.fromCharCode(b)).join("");
+  const clave = claveBytes.map(b => String.fromCharCode(b)).join("");
+
+  let dec = Buffer.from(datos, "base64").toString("utf8");
+  dec = dec.split("").reverse().join("");
+  const bytes = Buffer.from(dec, "base64");
+  return Array.from(bytes).map((b, i) =>
+    String.fromCharCode(b ^ clave.charCodeAt(i % clave.length))
+  ).join("");
 }
 
 client.on("ready", () => {
@@ -169,13 +167,35 @@ client.on("messageCreate", async (msg) => {
     msg.reply({ embeds: [embed], files: [attachment] });
   }
 
+  // !deobf con archivo
+  if (msg.content.startsWith("!deobf") && msg.attachments.size > 0) {
+    const archivo = msg.attachments.first();
+    try {
+      const response = await fetch(archivo.url);
+      const texto = await response.text();
+      const resultado = deobfuscarLua(texto);
+      if (!resultado) return msg.reply("❌ No se pudo deobfuscar. ¿Es un archivo de CrypexBot?");
+      const buffer = Buffer.from(resultado, "utf-8");
+      const attachment = new AttachmentBuilder(buffer, { name: "deobfuscado.lua" });
+      const embed = new EmbedBuilder()
+        .setTitle("🔓 Archivo Deobfuscado")
+        .setDescription("Aquí está tu código original 👇")
+        .setColor(0x57F287);
+      msg.reply({ embeds: [embed], files: [attachment] });
+    } catch {
+      msg.reply("❌ Error al procesar el archivo.");
+    }
+    return;
+  }
+
   // !ayuda
   if (msg.content === "!ayuda") {
     const embed = new EmbedBuilder()
       .setTitle("📖 Comandos")
       .addFields(
+        { name: "!obf + archivo .lua", value: "Obfusca un archivo Lua" },
         { name: "!obf <texto>", value: "Obfusca código Lua" },
-        { name: "!obf + archivo .lua", value: "Obfusca un archivo Lua completo" }
+        { name: "!deobf + archivo .lua", value: "Deobfusca un archivo de CrypexBot" }
       )
       .setColor(0xFEE75C);
     msg.reply({ embeds: [embed] });
