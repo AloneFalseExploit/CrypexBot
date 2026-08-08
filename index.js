@@ -11,15 +11,31 @@ const client = new Client({
 const KEY = "clave_secreta_123";
 
 function obfuscar(text, key) {
-  return Buffer.from(
+  // Capa 1: XOR
+  let xored = Buffer.from(
     text.split("").map((c, i) =>
       c.charCodeAt(0) ^ key.charCodeAt(i % key.length)
     )
   ).toString("base64");
+
+  // Capa 2: Invertir el string
+  let invertido = xored.split("").reverse().join("");
+
+  // Capa 3: Otro Base64
+  let final = Buffer.from(invertido).toString("base64");
+
+  return final;
 }
 
 function deobfuscar(encoded, key) {
-  const bytes = Buffer.from(encoded, "base64");
+  // Revertir capa 3
+  let invertido = Buffer.from(encoded, "base64").toString("utf8");
+
+  // Revertir capa 2
+  let xored = invertido.split("").reverse().join("");
+
+  // Revertir capa 1
+  const bytes = Buffer.from(xored, "base64");
   return Array.from(bytes).map((b, i) =>
     String.fromCharCode(b ^ key.charCodeAt(i % key.length))
   ).join("");
