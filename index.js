@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
+const { Client, GatewayIntentBits, EmbedBuilder, AttachmentBuilder } = require("discord.js");
 
 const client = new Client({
   intents: [
@@ -32,6 +32,50 @@ client.on("ready", () => {
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
 
+  // !obf con archivo adjunto
+  if (msg.content.startsWith("!obf") && msg.attachments.size > 0) {
+    const archivo = msg.attachments.first();
+    if (!archivo.name.endsWith(".lua") && !archivo.name.endsWith(".txt")) {
+      return msg.reply("❌ Solo se aceptan archivos .lua o .txt");
+    }
+    try {
+      const response = await fetch(archivo.url);
+      const texto = await response.text();
+      const resultado = obfuscar(texto, KEY);
+      const buffer = Buffer.from(resultado, "utf-8");
+      const attachment = new AttachmentBuilder(buffer, { name: "obfuscado.txt" });
+      const embed = new EmbedBuilder()
+        .setTitle("🔒 Archivo Obfuscado")
+        .setDescription("Aquí está tu archivo obfuscado 👇")
+        .setColor(0x5865F2);
+      msg.reply({ embeds: [embed], files: [attachment] });
+    } catch {
+      msg.reply("❌ Error al procesar el archivo.");
+    }
+    return;
+  }
+
+  // !deobf con archivo adjunto
+  if (msg.content.startsWith("!deobf") && msg.attachments.size > 0) {
+    const archivo = msg.attachments.first();
+    try {
+      const response = await fetch(archivo.url);
+      const texto = await response.text();
+      const resultado = deobfuscar(texto.trim(), KEY);
+      const buffer = Buffer.from(resultado, "utf-8");
+      const attachment = new AttachmentBuilder(buffer, { name: "deobfuscado.lua" });
+      const embed = new EmbedBuilder()
+        .setTitle("🔓 Archivo Deobfuscado")
+        .setDescription("Aquí está tu archivo deobfuscado 👇")
+        .setColor(0x57F287);
+      msg.reply({ embeds: [embed], files: [attachment] });
+    } catch {
+      msg.reply("❌ Error al procesar el archivo.");
+    }
+    return;
+  }
+
+  // !obf <texto>
   if (msg.content.startsWith("!obf ")) {
     const texto = msg.content.slice(5);
     const resultado = obfuscar(texto, KEY);
@@ -43,6 +87,7 @@ client.on("messageCreate", async (msg) => {
     msg.reply({ embeds: [embed] });
   }
 
+  // !deobf <texto>
   if (msg.content.startsWith("!deobf ")) {
     const codigo = msg.content.slice(7).trim();
     try {
@@ -57,12 +102,15 @@ client.on("messageCreate", async (msg) => {
     }
   }
 
+  // !ayuda
   if (msg.content === "!ayuda") {
     const embed = new EmbedBuilder()
       .setTitle("📖 Comandos")
       .addFields(
         { name: "!obf <texto>", value: "Obfusca un texto" },
-        { name: "!deobf <código>", value: "Deobfusca un texto" }
+        { name: "!obf + archivo .lua", value: "Obfusca un archivo Lua" },
+        { name: "!deobf <código>", value: "Deobfusca un texto" },
+        { name: "!deobf + archivo .txt", value: "Deobfusca un archivo" }
       )
       .setColor(0xFEE75C);
     msg.reply({ embeds: [embed] });
