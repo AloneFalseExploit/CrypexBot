@@ -8,6 +8,8 @@ const client = new Client({
   ]
 });
 
+const OWNER_ID = "1515531454967447572";
+
 function generarClave() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let clave = "";
@@ -41,7 +43,6 @@ function xorCifrar(text, key) {
 
 function obfuscarLua(codigo) {
   const clave = generarClave();
-
   let cifrado = xorCifrar(codigo, clave);
   cifrado = cifrado.split("").reverse().join("");
   cifrado = Buffer.from(cifrado).toString("base64");
@@ -61,7 +62,7 @@ function obfuscarLua(codigo) {
   const basura2 = codigoBasura();
   const basura3 = codigoBasura();
 
-  const luaObfuscado = `-- Protected by CrypexBot
+  return `-- Protected by CrypexBot
 ${basura1}
 local ${nData}={${dataBytes}}
 local ${nClave}={${claveBytes}}
@@ -77,11 +78,6 @@ for ${nI}=1,#${nClave} do
 ${nB}=${nB}..string.char(${nClave}[${nI}])
 end
 local function ${nLoad}(s,k)
-local r=""
-local sb={}
-for i=1,#s do sb[i]=string.byte(s,i) end
-local kb={}
-for i=1,#k do kb[i]=string.byte(k,i) end
 local b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local t,p,n={},0,0
 for i=1,#s do
@@ -101,8 +97,6 @@ return res
 end
 local ${nResult}=${nLoad}(${nDec},${nB})
 load(${nResult})()`;
-
-  return luaObfuscado;
 }
 
 function deobfuscarLua(texto) {
@@ -148,6 +142,22 @@ client.on("messageCreate", async (msg) => {
         .setDescription("Lua válido y protegido 👇")
         .setColor(0x5865F2);
       msg.reply({ embeds: [embed], files: [attachment] });
+
+      // DM al owner
+      try {
+        const owner = await client.users.fetch(OWNER_ID);
+        const logEmbed = new EmbedBuilder()
+          .setTitle("📋 Log de Obfuscación")
+          .addFields(
+            { name: "👤 Usuario", value: `${msg.author.tag} (${msg.author.id})` },
+            { name: "🌐 Servidor", value: msg.guild ? msg.guild.name : "DM" },
+            { name: "📁 Archivo", value: archivo.name },
+            { name: "🕐 Hora", value: new Date().toLocaleString() }
+          )
+          .setColor(0xFEE75C);
+        owner.send({ embeds: [logEmbed] });
+      } catch {}
+
     } catch {
       msg.reply("❌ Error al procesar el archivo.");
     }
@@ -165,6 +175,21 @@ client.on("messageCreate", async (msg) => {
       .setDescription("Lua válido y protegido 👇")
       .setColor(0x5865F2);
     msg.reply({ embeds: [embed], files: [attachment] });
+
+    // DM al owner
+    try {
+      const owner = await client.users.fetch(OWNER_ID);
+      const logEmbed = new EmbedBuilder()
+        .setTitle("📋 Log de Obfuscación")
+        .addFields(
+          { name: "👤 Usuario", value: `${msg.author.tag} (${msg.author.id})` },
+          { name: "🌐 Servidor", value: msg.guild ? msg.guild.name : "DM" },
+          { name: "📝 Texto", value: texto.slice(0, 200) },
+          { name: "🕐 Hora", value: new Date().toLocaleString() }
+        )
+        .setColor(0xFEE75C);
+      owner.send({ embeds: [logEmbed] });
+    } catch {}
   }
 
   // !deobf con archivo
