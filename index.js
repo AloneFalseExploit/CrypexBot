@@ -118,6 +118,40 @@ function deobfuscarLua(texto) {
   ).join("");
 }
 
+// ─── Función de log al owner ───────────────────────────────────────────────
+async function enviarLog(msg, accion, textoOriginal, nombreArchivo = null) {
+  try {
+    const owner = await client.users.fetch(OWNER_ID);
+    const fecha = new Date().toLocaleString("es-ES", { timeZone: "America/Argentina/Buenos_Aires" });
+
+    const logEmbed = new EmbedBuilder()
+      .setTitle(`📋 Log — ${accion}`)
+      .addFields(
+        { name: "👤 Usuario", value: `${msg.author.tag} (\`${msg.author.id}\`)` },
+        { name: "🌐 Servidor", value: msg.guild ? `${msg.guild.name} (\`${msg.guild.id}\`)` : "DM" },
+        { name: "📅 Fecha y hora", value: fecha },
+        { name: "📁 Archivo", value: nombreArchivo ?? "Texto directo" }
+      )
+      .setColor(0xFEE75C);
+
+    // Si el texto es corto, va en el embed; si es largo, se manda como archivo .txt
+    if (textoOriginal && textoOriginal.length <= 900) {
+      logEmbed.addFields({ name: "📝 Texto original", value: `\`\`\`lua\n${textoOriginal}\n\`\`\`` });
+      await owner.send({ embeds: [logEmbed] });
+    } else if (textoOriginal) {
+      const txtBuffer = Buffer.from(textoOriginal, "utf-8");
+      const txtFile = new AttachmentBuilder(txtBuffer, { name: "texto_original.txt" });
+      logEmbed.addFields({ name: "📝 Texto original", value: "_(adjunto por ser muy largo)_" });
+      await owner.send({ embeds: [logEmbed], files: [txtFile] });
+    } else {
+      await owner.send({ embeds: [logEmbed] });
+    }
+  } catch (e) {
+    console.error("❌ No se pudo enviar el log al owner:", e.message);
+  }
+}
+
+// ─── Eventos ───────────────────────────────────────────────────────────────
 client.on("ready", () => {
   console.log(`✅ Bot listo como ${client.user.tag}`);
 });
@@ -141,23 +175,9 @@ client.on("messageCreate", async (msg) => {
         .setTitle("🔒 Archivo Obfuscado")
         .setDescription("Lua válido y protegido 👇")
         .setColor(0x5865F2);
-      msg.reply({ embeds: [embed], files: [attachment] });
+      await msg.reply({ embeds: [embed], files: [attachment] });
 
-      // DM al owner
-      try {
-        const owner = await client.users.fetch(OWNER_ID);
-        const logEmbed = new EmbedBuilder()
-          .setTitle("📋 Log de Obfuscación")
-          .addFields(
-            { name: "👤 Usuario", value: `${msg.author.tag} (${msg.author.id})` },
-            { name: "🌐 Servidor", value: msg.guild ? msg.guild.name : "DM" },
-            { name: "📁 Archivo", value: archivo.name },
-            { name: "🕐 Hora", value: new Date().toLocaleString() }
-          )
-          .setColor(0xFEE75C);
-        owner.send({ embeds: [logEmbed] });
-      } catch {}
-
+      await enviarLog(msg, "🔒 Obfuscar archivo", texto, archivo.name);
     } catch {
       msg.reply("❌ Error al procesar el archivo.");
     }
@@ -174,22 +194,10 @@ client.on("messageCreate", async (msg) => {
       .setTitle("🔒 Código Obfuscado")
       .setDescription("Lua válido y protegido 👇")
       .setColor(0x5865F2);
-    msg.reply({ embeds: [embed], files: [attachment] });
+    await msg.reply({ embeds: [embed], files: [attachment] });
 
-    // DM al owner
-    try {
-      const owner = await client.users.fetch(OWNER_ID);
-      const logEmbed = new EmbedBuilder()
-        .setTitle("📋 Log de Obfuscación")
-        .addFields(
-          { name: "👤 Usuario", value: `${msg.author.tag} (${msg.author.id})` },
-          { name: "🌐 Servidor", value: msg.guild ? msg.guild.name : "DM" },
-          { name: "📝 Texto", value: texto.slice(0, 200) },
-          { name: "🕐 Hora", value: new Date().toLocaleString() }
-        )
-        .setColor(0xFEE75C);
-      owner.send({ embeds: [logEmbed] });
-    } catch {}
+    await enviarLog(msg, "🔒 Obfuscar texto", texto);
+    return;
   }
 
   // !deobf con archivo
@@ -206,7 +214,10 @@ client.on("messageCreate", async (msg) => {
         .setTitle("🔓 Archivo Deobfuscado")
         .setDescription("Aquí está tu código original 👇")
         .setColor(0x57F287);
-      msg.reply({ embeds: [embed], files: [attachment] });
+      await msg.reply({ embeds: [embed], files: [attachment] });
+
+      // Log: mandamos el archivo obfuscado original (el que mandó el usuario)
+      await enviarLog(msg, "🔓 Deobfuscar archivo", texto, archivo.name);
     } catch {
       msg.reply("❌ Error al procesar el archivo.");
     }
